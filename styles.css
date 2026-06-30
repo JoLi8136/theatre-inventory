@@ -70,3 +70,22 @@ body {
   text-decoration: none;
   cursor: pointer;
 }
+
+#group-nav {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 0.5vw;
+    padding: 1vh 2vw;
+}
+
+#group-nav button {
+    opacity: 0.6;
+    cursor: pointer;
+}
+
+#group-nav button.active {
+    opacity: 1;
+    font-weight: bold;
+    border-bottom: 2px solid currentColor;
+}

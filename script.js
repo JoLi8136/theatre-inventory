@@ -1,9 +1,11 @@
 // Inventory Data
+let allData = [];
 let groupData = [];
 let filteredData = [];
 let activeType = '';
 let activeCategory = '';
 let searchQuery = '';
+let activeGroup = null;
 
 // Separate catalogues by groups
 const GROUP_CONFIG = {
@@ -13,7 +15,7 @@ const GROUP_CONFIG = {
     types: ['Props', 'Equipment', 'Hats', 'Costumes', 'Accessories']
   },
   'musicalforum': {
-    name: 'MF',
+    name: 'Musical Forum',
     url: 'https://script.google.com/macros/s/AKfycbws_PeLtRVyZZLePCGrzWMvztMiuY2SZbJFv_IBCB6rFdJzd5x7Ywx9-Hf11G3AKVO8nA/exec',
     types: ['Resources', 'Props', 'Costumes', 'Lights/Sound', 'Instruments/Music']
   },
@@ -24,18 +26,11 @@ const GROUP_CONFIG = {
   }
 };
 
-// Check groups by URL
+// URL
 const params = new URLSearchParams(window.location.search);
 const slug = params.get('group');
-
-if (slug && !GROUP_CONFIG[slug]) {
-    document.body.innerHTML = '<p>Page not found.</p>';
-    throw new Error('Unknown group');
-}
-
-const isAllGroups = !slug ||  !GROUP_CONFIG[slug];
+const isAllGroups = !slug || !GROUP_CONFIG[slug];
 const config = isAllGroups ? null : GROUP_CONFIG[slug];
-const currentGroup = config?.name ?? 'All Groups';
 
 const typeSelect = document.getElementById('type-filter');
 const categorySelect = document.getElementById('category-filter');
@@ -67,37 +62,81 @@ if (searchInput) {
 
 async function loadInventory() {
     try {
-        if (isAllGroups) {
-            const results = await Promise.all(
-                Object.values(GROUP_CONFIG).filter(g => g.url).map(g => fetch(g.url).then(r => r.json()))
-            );
-            groupData = results.flatMap(sheetData =>
-                Object.values(sheetData).flat()
-            );
-        } else {
-            const res = await fetch(config.url);
-            const sheetData = await res.json();
-            groupData = Object.values(sheetData).flat()
-        }
-
-        groupData = groupData.filter(item => {
+        const results = await Promise.all(
+            Object.entries(GROUP_CONFIG).filter(([,g]) => g.url)
+            .map(async([slug,g]) => {
+                const res = await fetch(g.url);
+                const sheetData = await res.json();
+                return Object.values(sheetData).flat().map(item => ({
+                    ...item,
+                    _group: slug
+                }));
+            })
+        );
+        allData = results.flat().filter(item => {
             const name = item.item;
             return name && name.toString().trim() !== '' &&
                 !name.toString().toLowerCase().includes('null');
         });
+        const initialSlug = new URLSearchParams(window.location.search).get('group');
+        if(initialSlug && GROUP_CONFIG[initialSlug]) {
+            groupData = allData.filter(item => item._group === initialSlug);
+            highlightActiveButton(initialSlug);
+        } else {
+            groupData = allData;
+            highlightActiveButton(null);
+        }
 
-        groupData.sort((a,b) => (a.item || '').localeCompare(b.item || ''));
+        applyGroupFilter();
 
-        buildDropDown();
-        buildCategoryDropDown();
-        applyUserFilters();
     } catch (err) {
         console.error("Failed to load inventory:", err);
     }
 }
 
-// Dropdown
-function buildDropDown() {
+function highlightActiveButton(slug) {
+    document.querySelectorAll('#group-nav button').forEach(btn => btn.classList.remove('active'));
+    const activeBtn = slug
+        ? document.getElementById(`btn-${slug}`)
+        : document.getElementById('btn-all');
+    if (activeBtn) activeBtn.classList.add('active');
+}
+
+function setGroup (slug) {
+    activeGroup = slug || null;
+    const newUrl = slug
+        ? `${window.location.pathname}?group=${slug}`
+        : window.location.pathname;
+    window.history.pushState({}, '', newUrl);
+
+    highlightActiveButton(slug);
+
+    activeType = '';
+    activeCategory = '';
+    searchQuery = '';
+    if (typeSelect) typeSelect.value = '';
+    if (categorySelect) categorySelect.value = '';
+    if (searchInput) searchInput.value = '';
+
+    if (!slug || !GROUP_CONFIG[slug]) {
+        groupData = allData; // show everything
+    } else {
+        const groupName = GROUP_CONFIG[slug].name;
+        groupData = allData.filter(item => item._group === slug);
+    }
+
+    applyGroupFilter();
+}
+
+function applyGroupFilter() {
+    groupData.sort((a,b) => (a.item || '').localeCompare(b.item || ''));
+    buildTypeDropDown();
+    buildCategoryDropDown();
+    applyUserFilters();
+}
+
+// Type Dropdown
+function buildTypeDropDown() {
     const types = [...new Set(groupData.map(item => item._type))];
     typeSelect.innerHTML = '<option value="">All types</option>';
     types.forEach(type => {
@@ -108,6 +147,7 @@ function buildDropDown() {
     });
 }
 
+// Category Dropdown
 function buildCategoryDropDown() {
     const sourceItems = activeType ? groupData.filter(item => item._type === activeType) : groupData;
     const categories = [...new Set(sourceItems.map(item => item.category).filter(cat => cat && cat.toString().trim() !== ''))].sort();
@@ -195,7 +235,7 @@ function openModal(index) {
         return;
     }
     
-    const defaultFields = ['item', 'image', '_type', 'quantity'];
+    const defaultFields = ['item', 'image', '_type', 'quantity', '_group'];
 
     const fields = Object.entries(item)
         .filter(([key]) => !defaultFields.includes(key))
@@ -213,6 +253,7 @@ function openModal(index) {
         >
         <p><strong>Quantity:</strong> ${item.quantity}</p>
         ${fields}
+        ${!activeGroup ? field("Group", GROUP_CONFIG[item._group]?.name) : ''}
     `;
     modal.style.display = "block";
 }
@@ -227,20 +268,13 @@ modal.style.display = "none";
 var closeButton = document.getElementById("close");
 
 
-closeButton.addEventListener("click", () => {
-    modal.style.display = "none";
-});
+closeButton.addEventListener("click", () => { modal.style.display = "none";});
 
 modal.addEventListener("click", (event) => {
-    if (event.target === modal) {
-        modal.style.display = "none";
-    }
+    if (event.target === modal) { modal.style.display = "none"; }
 });
-
 document.addEventListener("keydown", (event) => {
-    if(event.key === "Escape") {
-        modal.style.display = "none";
-    }
+    if(event.key === "Escape") { modal.style.display = "none";}
 });
 
 loadInventory();
