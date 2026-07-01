@@ -11,8 +11,8 @@
         <button onclick="setGroup('musicalforum')" id="btn-musicalforum">Musical Forum</button>
         <button onclick="setGroup('btc')" id="btn-btc">BTC</button>
     </nav>
-    
-    <h1>Closet Catalogue</h1>
+
+    <h1 style="margin-bottom: clamp(15px, 3vh, 25px);">Closet Catalogue</h1>
 
     <div>
         <input id="search"
@@ -35,6 +35,17 @@
     </div>
 
     <script src="script.js"></script>
+
+    <div id="input-modal">
+        <div id="input-modal-box">
+            <h3 id="input-modal-title"></h3>
+            <div id="input-modal-fields"></div>
+            <div style="display:flex;gap:8px;margin-top:16px">
+                <button id="input-modal-confirm">Confirm</button>
+                <button id="input-modal-cancel">Cancel</button>
+            </div>
+        </div>
+    </div>
 
 </body>
 </html>
