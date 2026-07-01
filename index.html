@@ -1,40 +1,41 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
     <title>Theatre Inventory</title>
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-    <nav id="group-nav">
-        <button onclick="setGroup(null)" id="btn-all">All Groups</button>
-        <button onclick="setGroup('ensemble')" id="btn-ensemble">Ensemble</button>
-        <button onclick="setGroup('musicalforum')" id="btn-musicalforum">Musical Forum</button>
-        <button onclick="setGroup('btc')" id="btn-btc">BTC</button>
-    </nav>
+    <header>
+        <div id="header-top">
+            <h1 style="margin-bottom: clamp(15px, 3vh, 25px);">Theatre Closet Catalogue</h1>
+            <nav id="group-nav">
+                <button onclick="setGroup(null)" id="btn-all">All Groups</button>
+                <button onclick="setGroup('ensemble')" id="btn-ensemble">Ensemble</button>
+                <button onclick="setGroup('musicalforum')" id="btn-musicalforum">Musical Forum</button>
+                <button onclick="setGroup('btc')" id="btn-btc">BTC</button>
+            </nav>
+        </div>
+        <div id="filter-bar">
+            <input id="search" type="text" placeholder="🔍 Search by name or tags...">
+            <select id="type-filter" class="filter"></select>
+            <select id="category-filter" class="filter"></select>
+        </div>
+    </header>
+    
+    <main>
+        <div id="inventory-container"></div>
+        <div id="loading-msg">
+            <div class="spinner"></div>
+            <p><i>it may take a bit to load...</i></p>
+        </div>
+    </main>
 
-    <h1 style="margin-bottom: clamp(15px, 3vh, 25px);">Closet Catalogue</h1>
-
-    <div>
-        <input id="search"
-            type="text"
-            id="search"
-            placeholder="Search inventory..."
-        >
-        <select id="type-filter" class="filter"></select>
-        <select id="category-filter" class="filter"></select>
-    </div>
-
-    <p><i>it may take a bit to load...</i></p>
-
-    <div id="inventory-container"></div>
     <div id="item-modal" class="modal">
         <div class="modal-content">
             <span id="close">&times;</span>
             <div id="modal-details"></div>
         </div>
     </div>
-
-    <script src="script.js"></script>
 
     <div id="input-modal">
         <div id="input-modal-box">
@@ -47,5 +48,6 @@
         </div>
     </div>
 
+    <script src="script.js"></script>
 </body>
 </html>

@@ -185,8 +185,10 @@ function getDriveImageUrl(url) {
 
 // Display inventory in cards and modals
 function displayInventory(items) {
-    const container = document.getElementById("inventory-container");
+    const loadingMsg = document.getElementById('loading-msg');
+    if (loadingMsg) loadingMsg.style.display = 'none';
 
+    const container = document.getElementById("inventory-container");
     container.innerHTML = "";
 
     const statusColors = {
@@ -503,6 +505,22 @@ Contact Email: ${userInfo.email || '[YOUR EMAIL]'}
 Please let me know if this is possible!
        
 Thank you!`;
+
+    itemList.forEach(({ item, itemId }) => {
+        fetch(CHECKOUT_URL, {
+            method: 'POST',
+            body: JSON.stringify({
+                action: 'borrowRequest',
+                item_id: itemId,
+                item_name: item.item,
+                group: item._group,
+                type: item._type,
+                requested_by: userInfo.name || '',
+                show_name: userInfo.show || '',
+                contact_email: userInfo.email || ''
+            })
+        }).catch(err => console.error('Failed to log borrow request:', err));
+    });
 
     const mailto = `mailto:${uniqueRecipients.join(',')}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
     window.location.href = mailto;
