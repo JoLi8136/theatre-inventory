@@ -5,9 +5,10 @@ let filteredData = [];
 let activeType = '';
 let activeCategory = '';
 let searchQuery = '';
+let activeStatus = null;
 let activeGroup = null;
 
-const CHECKOUT_URL = 'https://script.google.com/macros/s/AKfycbzafJii9wFpoHEr50JElZDlgKUBLhCx8-zFfY-6-aFxSs_axqgx-UqgwtfaLqI_ZpX3/exec';
+const CHECKOUT_URL = 'https://script.google.com/macros/s/AKfycbz4peIvc7HqVMzYHcRJE0CUjeUHRSIBnSLN2TC9RGjGZ4tn21aTKJXOsbPi9zStEPqA/exec';
 let checkoutStatus = {};
 let borrowStatus = {};
 let selectedItems = new Set();
@@ -81,7 +82,7 @@ async function loadInventory() {
                 const name = item.item;
                 return name && name.toString().trim() !== '' &&
                     !name.toString().toLowerCase().includes('null');
-            }).map(item => ({ ...item, _group: slug }));
+            }).map((item, index) => ({ ...item, _group: slug, _uid: `${slug}__${index}` }));
             console.log("first item in allData:", allData[slug]?.[0]);
         }));
         
@@ -90,6 +91,44 @@ async function loadInventory() {
 
     } catch (err) {
         console.error("Failed to load inventory:", err);
+    }
+}
+
+// Poll every 30 seconds to stay in sync across devices
+const SYNC_POLL_INTERVAL = 30000;
+const NEW_ITEMS_POLL_INTERVAL = 43200000;
+
+async function startPolling() {
+    try {
+        await loadCheckouts();
+        applyUserFilters();
+    } catch (error) {
+        console.error("Syncing failed:", error);
+    } finally {
+        setTimeout(startPolling, SYNC_POLL_INTERVAL);
+    }
+}
+
+async function checkNewItemsInSheet() {
+    try {
+        const groupsWithUrls = Object.entries(GROUP_CONFIG).filter(([,g]) => g.url);
+        await Promise.all(groupsWithUrls.map(async ([slug, g]) => {
+            const res = await fetch(g.url); 
+            const sheetData = await res.json();
+            allData[slug] = Object.values(sheetData).flat()
+                .filter(item => {
+                    const name = item.item;
+                    return name && name.toString().trim() !== '' &&
+                        !name.toString().toLowerCase().includes('null');
+                }).map((item, index) => ({ ...item, _group: slug, _uid: `${slug}__${index}` }));
+        }));
+
+        await loadCheckouts();
+        applyGroupFilter();
+    } catch (error) {
+        console.error("Failed to retrieve new items:", error);
+    } finally {
+        setTimeout(checkNewItemsInSheet, NEW_ITEMS_POLL_INTERVAL);
     }
 }
 
@@ -124,7 +163,7 @@ function applyGroupFilter() {
         ? (allData[activeGroup] || [])
         : Object.values(allData).flat();
 
-    groupData.sort((a,b) => (a.item || '').localeCompare(b.item || ''));
+    groupData.sort((a,b) => String(a.item || '').localeCompare(String(b.item || '')));
     buildTypeDropDown();
     buildCategoryDropDown();
     applyUserFilters();
@@ -158,17 +197,36 @@ function buildCategoryDropDown() {
     activeCategory = '';
     categorySelect.value = '';
 }
+
+function setStatus(newStatus) {
+    activeStatus = newStatus;
+    document.querySelectorAll('.status-btn').forEach(btn => btn.classList.remove('active'));
+    const activeBtn = newStatus === null ? document.getElementById('status-all') : newStatus === 'available' ? document.getElementById('available-filter') : document.getElementById('unavailable-filter');
+    if (activeBtn) activeBtn.classList.add('active');
+    applyUserFilters();
+}
+
 // User filter for type
 function applyUserFilters() {
     filteredData = groupData.filter(item => {
         const matchesType =!activeType || item._type === activeType;
         const matchesCategory =!activeCategory || item.category === activeCategory;
+        
+        const groupArray = allData[item._group] || [];
+        const stableIndex = groupArray.indexOf(item);
+        const itemId = item._uid;
+        const status = getItemStatus(itemId);
+        const matchesStatus = !activeStatus || 
+            (activeStatus === 'available' && status === 'available') ||
+            (activeStatus === 'unavailable' && status !== 'available');
+       
         const matchesSearch = !searchQuery || [
             item.item,
             item.tags,
         ].some(field =>
             field && field.toString().toLowerCase().includes(searchQuery.toLowerCase()));
-        return matchesType && matchesCategory && matchesSearch;
+        
+        return matchesType && matchesCategory && matchesStatus && matchesSearch;
     });
     displayInventory(filteredData);
 }
@@ -204,7 +262,9 @@ function displayInventory(items) {
 
     items.forEach(item => {
         const globalIndex = groupData.indexOf(item);
-        const itemId = `${item._group}-${globalIndex}`;
+        const groupArray = allData[item._group] || [];
+        const stableIndex = groupArray.indexOf(item);
+        const itemId = item._uid;
         const status = getItemStatus(itemId);
         const isSelected = selectedItems.has(itemId);
 
@@ -256,12 +316,12 @@ function openModal(index, itemId) {
     const item = groupData[index];
     if (!item) { return; }
     
-    const id = itemId || `${item._group}-${index}`;
+    const id = itemId || item._uid;
     const status = getItemStatus(id);
     const checkoutInfo = checkoutStatus[id];
     const borrowInfo = borrowStatus[id];
 
-    const defaultFields = ['item', 'image', '_type', 'quantity', '_group'];
+    const defaultFields = ['item', 'image', '_type', 'quantity', '_group', '_uid'];
 
     const fields = Object.entries(item)
         .filter(([key]) => !defaultFields.includes(key))
@@ -408,8 +468,14 @@ async function loadCheckouts() {
             fetch(`${CHECKOUT_URL}?action=getBorrowRequests`).then(r => r.json())
         ]);
 
+        console.log("raw checkouts:", checkouts);
+
+        checkoutStatus = {};
         checkouts.forEach(c => {
-            if (c.returned === 'false') {
+            const isReturned = c.returned === true ||
+                               c.returned === 'true' ||
+                               c.returned === 'TRUE';
+            if (!isReturned && c.item_id) {
                 checkoutStatus[c.item_id] = {
                     checked_out_by: c.checked_out_by,
                     show_name: c.show_name,
@@ -417,6 +483,8 @@ async function loadCheckouts() {
                 };
             }
         });
+
+        console.log("checkoutStatus after load:", checkoutStatus);
 
         borrows.forEach(b => {
             if (b.status === 'approved') {
@@ -476,35 +544,6 @@ async function loadEmailConfig() {
 
 function openBorrowEmail(itemList, userInfo = {}) {
     const groupsInvolved = [...new Set(itemList.map(({ item }) => item._group).filter(Boolean))];
-    const recipients = groupsInvolved.flatMap(group => {
-        const emails = emailConfig[group] || {};
-        return [emails.groupEmail, emails.chairEmail].filter(e => e);
-    });
-    const uniqueRecipients = [...new Set(recipients)];
-
-    const groupNames = groupsInvolved
-        .map(g => GROUP_CONFIG[g]?.name)
-        .filter(Boolean)
-        .join(' & ');
-    
-    const itemLines = itemList.map(({ item }) => 
-        `   - ${item.item} (${item._type})`
-    ).join('\n');
-
-    const subject = `Borrow Request - ${groupNames} Closet`;
-    const body = 
-`Hello,
-    
-I would like to request to borrow the following item(s) from the ${groupNames} closet for ${userInfo.show || '[YOUR SHOW]'}:
-        
-${itemLines}
-    
-Name: ${userInfo.name || '[YOUR NAME]'}
-Contact Email: ${userInfo.email || '[YOUR EMAIL]'}
-       
-Please let me know if this is possible!
-       
-Thank you!`;
 
     itemList.forEach(({ item, itemId }) => {
         fetch(CHECKOUT_URL, {
@@ -522,8 +561,48 @@ Thank you!`;
         }).catch(err => console.error('Failed to log borrow request:', err));
     });
 
-    const mailto = `mailto:${uniqueRecipients.join(',')}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-    window.location.href = mailto;
+    const mailtoLinks = groupsInvolved.map(group => {
+        const emails = emailConfig[group] || {};
+        const recipients = [emails.groupEmail, emails.chairEmail].filter(e => e);
+        const groupName = GROUP_CONFIG[group]?.name || group;
+        const groupItems = itemList.filter(({ item }) => item._group === group);
+
+        const itemLines = groupItems.map(({ item }) => 
+        `   - ${item.item} (${item._type})`
+    ).join('\n');
+
+        const groupAdminUrl = `https://joli8136.github.io/closet-catalogue/admin.html?group=${group}`;
+
+        const subject = `Borrow Request - ${groupName} Closet`;
+        const body = 
+`Hello,
+    
+I would like to request to borrow the following item(s) from the ${groupName} closet for ${userInfo.show || '[YOUR SHOW]'}:
+        
+${itemLines}
+    
+Name: ${userInfo.name || '[YOUR NAME]'}
+Contact Email: ${userInfo.email || '[YOUR EMAIL]'}
+       
+Please let me know if this is possible!
+
+Thank you!
+
+==========
+
+Use this link to approve or deny this request:
+${groupAdminUrl}
+`;
+        return `mailto:${recipients.join(',')}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+    });
+
+    mailtoLinks.forEach((mailto, i) => {
+        if (i === 0) {
+            window.location.href = mailto;
+        } else {
+            setTimeout(() => {window.location.href = mailto;}, i * 1500)
+        }
+    });
 }
 
 // MULTI SELECT
@@ -605,9 +684,7 @@ async function bulkCheckout() {
 
     const failed = [];
     for (const itemId of availableIds) {
-        const parts = itemId.split('-');
-        const indexStr = parts[parts.length - 1];
-        const item = groupData[parseInt(indexStr)];
+        const item = groupData.find(i => i._uid === itemId);
         if (!item) continue;
         const result = await listCheckoutItems(
             itemId, item.item, item._group, item._type, values.name, values.show
@@ -659,9 +736,7 @@ async function bulkBorrow() {
     if (selectedItems.size === 0) return;
     const availableIds = [...selectedItems].filter(id => !checkoutStatus[id]);
     const itemList = availableIds.map(itemId => {
-        const parts = itemId.split('-');
-        const indexStr = parts[parts.length - 1]; 
-        const item = groupData[parseInt(indexStr)];
+        const item = groupData.find(i => i._uid === itemId);
         return { item, itemId };
     }).filter(({ item }) => item && item._group);
 
@@ -726,7 +801,7 @@ function showInputModal(title, fields) {
                 const val = inputEl.value.trim();
                 if (!val) { 
                     valid = false; 
-                    input.style.borderColor = '#ef4444'; 
+                    inputEl.style.borderColor = '#ef4444'; 
                     return; 
                 }
                 inputEl.style.borderColor = '#ddd';
@@ -763,4 +838,6 @@ function showInputModal(title, fields) {
 loadInventory().then(() => {
     const initialSlug = new URLSearchParams(window.location.search).get('group');
     setGroup(GROUP_CONFIG[initialSlug] ? initialSlug : null);
+    startPolling();
+    checkNewItemsInSheet();
 });

@@ -110,6 +110,63 @@ header h1 {
     box-shadow: 0 0 0 3px rgba(0,0,0,0.06);
     background: white;
 }
+/* –– Status Filter –– */
+#availability-filter {
+    display: flex;
+    gap: 4px;
+    padding: 4px;
+    border-radius: 8px;
+}
+
+.status-btn {
+    background-color: #6b7280;
+    border: 2px solid transparent;
+    font-size: clamp(0.6rem, 0.85vw, 0.7rem);
+    padding: clamp(2px, 0.3vh, 3px) clamp(6px, 0.8vw, 10px);
+    border-radius: 999px;
+    cursor: pointer;
+    font-family: inherit;
+    font-weight: 500;
+    transition: all 0.15s;
+    white-space: nowrap;
+    position: relative;
+    overflow: hidden;
+    color: white;
+
+}
+
+.status-btn::after { 
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: white;
+    opacity: 0;
+    transition: opacity 0.15s;
+    pointer-events: none;
+}
+
+.status-btn:hover::after { opacity: 0.3; }
+.status-btn.active::after { opacity: 0.35; }
+
+#avail-all {
+    background: #1a1a1a;
+    color: #ece9e0;
+    border-color: #1a1a1a;
+}
+
+/* Available button */
+#available-filter {
+    background: #22c55e;
+    color: #f8f7f4;
+    border-color: #22c55e;
+}
+
+/* In Use button */
+#unavailable-filter {
+    background: #f97316;
+    color: #f8f7f4;
+    border-color: #f97316;
+}
 
 /* ── Main ── */
 main {
@@ -469,7 +526,7 @@ main {
 }
 
 /* ── Mobile ── */
-/* @media (max-width: 600px) {
+@media (max-width: 900px) {
     #header-top {
         flex-direction: column;
         align-items: flex-start;
@@ -518,4 +575,4 @@ main {
         min-width: 80px;
         text-align: center;
     }
-} */
+}

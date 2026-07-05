@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>Admin — Borrow Requests</title>
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        main { padding: clamp(16px, 3vw, 32px); }
+
+        table { width: 100%; border-collapse: collapse; margin-top: 24px; }
+        th, td { padding: 12px 16px; border: 1px solid #e5e7eb; text-align: left; font-size: clamp(0.78rem, 1.1vw, 0.9rem); }
+        th { background: #f9fafb; font-weight: 600; }
+        tr:hover { background: #f9fafb; }
+
+        .btn-approve { background: #22c55e; color: white; border: none; padding: 6px 14px; border-radius: 6px; cursor: pointer; font-family: inherit; font-size: 0.85rem; }
+        .btn-deny { background: #ef4444; color: white; border: none; padding: 6px 14px; border-radius: 6px; cursor: pointer; font-family: inherit; font-size: 0.85rem; }
+
+        .badge { display: inline-block; padding: 3px 10px; border-radius: 999px; font-size: 0.75rem; font-weight: 500; }
+        .badge-pending { background: #fef9c3; color: #854d0e; }
+        .badge-approved { background: #dcfce7; color: #15803d; }
+        .badge-denied { background: #fee2e2; color: #991b1b; }
+
+        #status-msg { padding: 12px 16px; border-radius: 8px; margin-top: 16px; display: none; }
+        .success { background: #dcfce7; color: #15803d; }
+        .error { background: #fee2e2; color: #991b1b; }
+
+        #filter-btns { display: flex; gap: 8px; margin-top: 16px; flex-wrap: wrap; }
+        #filter-btns button { padding: 6px 16px; border-radius: 999px; border: 1.5px solid #e5e7eb; background: white; cursor: pointer; font-family: inherit; font-size: 0.85rem; color: #6b7280; }
+        #filter-btns button.active { background: #1a1a1a; color: white; border-color: #1a1a1a; }
+
+        #loading-admin { color: #9ca3af; padding: 40px 0; text-align: center; }
+
+        /* Reply modal */
+        #reply-modal {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background: rgba(0,0,0,0.4);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            padding: 16px;
+            backdrop-filter: blur(2px);
+        }
+
+        #reply-modal-box {
+            background: white;
+            border-radius: 14px;
+            padding: clamp(20px, 3vw, 32px);
+            max-width: 500px;
+            width: 100%;
+        }
+
+        #reply-modal-box h3 {
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin-bottom: 16px;
+        }
+
+        #reply-preview {
+            background: #f8f7f4;
+            border-radius: 8px;
+            padding: 12px 16px;
+            margin-bottom: 16px;
+            font-size: 0.88rem;
+            line-height: 1.6;
+        }
+
+        #reply-note {
+            width: 100%;
+            padding: 10px 14px;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            font-family: inherit;
+            font-size: 0.9rem;
+            resize: vertical;
+            min-height: 80px;
+            outline: none;
+            background: #f8f7f4;
+        }
+
+        #reply-note:focus {
+            border-color: #1a1a1a;
+            background: white;
+        }
+
+        .reply-note-label {
+            font-size: 0.85rem;
+            color: #6b7280;
+            margin-bottom: 6px;
+            display: block;
+        }
+
+        .reply-actions {
+            display: flex;
+            gap: 8px;
+            margin-top: 16px;
+        }
+
+        #reply-confirm {
+            flex: 1;
+            background: #1a1a1a;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-family: inherit;
+            font-size: 0.95rem;
+            font-weight: 500;
+        }
+
+        #reply-cancel {
+            background: #f3f4f6;
+            color: #6b7280;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-family: inherit;
+            font-size: 0.95rem;
+        }
+
+        @media (max-width: 600px) {
+            table { display: block; overflow-x: auto; }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div id="header-top">
+            <h1 id="admin-group-label">🎭 Borrow Requests</h1>
+            <a href="index.html" style="font-size:0.9rem;color:#6b7280;text-decoration:none">← Back to catalogue</a>
+        </div>
+    </header>
+
+    <main>
+        <div id="status-msg"></div>
+        <div id="filter-btns">
+            <button onclick="filterRequests('pending')" id="f-pending" class="active">Pending</button>
+            <button onclick="filterRequests('approved')" id="f-approved">Approved</button>
+            <button onclick="filterRequests('denied')" id="f-denied">Denied</button>
+            <button onclick="filterRequests('all')" id="f-all">All</button>
+        </div>
+        <div id="loading-admin">Loading requests...</div>
+        <div id="admin-container"></div>
+    </main>
+
+    <!-- Reply modal -->
+    <div id="reply-modal">
+        <div id="reply-modal-box">
+            <h3 id="reply-modal-title"></h3>
+            <div id="reply-preview"></div>
+            <label class="reply-note-label">
+                Optional note to include in the reply email:
+            </label>
+            <textarea id="reply-note" placeholder="e.g. Please return by May 15th / Unfortunately this item is reserved..."></textarea>
+            <div class="reply-actions">
+                <button id="reply-confirm" onclick="confirmReply()">Confirm & Send Reply Email</button>
+                <button id="reply-cancel" onclick="closeReplyModal()">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="admin.js"></script>
+</body>
+</html>

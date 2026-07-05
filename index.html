@@ -19,6 +19,11 @@
             <input id="search" type="text" placeholder="🔍 Search by name or tags...">
             <select id="type-filter" class="filter"></select>
             <select id="category-filter" class="filter"></select>
+            <div id="availability-filter">
+                <button onclick="setStatus(null)" id="status-all" class="status-btn active">ALL</button>
+                <button onclick="setStatus('available')" id="available-filter" class="status-btn avail">+</button>
+                <button onclick="setStatus('unavailable')"id="unavailable-filter" class="status-btn unavail">x</button>
+            </div>
         </div>
     </header>
     
