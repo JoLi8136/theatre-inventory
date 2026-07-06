@@ -19,17 +19,14 @@ const GROUP_CONFIG = {
   'ensemble': {
     name: 'Ensemble',
     url: 'https://script.google.com/macros/s/AKfycbwdRHLILnY9v7ZBY607JBrRhLxdhV6hFSOkCZQrhKQ42_vuHaDHiehrftk2Hrvn48m4fA/exec',
-    types: ['Props', 'Equipment', 'Hats', 'Costumes', 'Accessories']
   },
   'musicalforum': {
     name: 'Musical Forum',
     url: 'https://script.google.com/macros/s/AKfycbws_PeLtRVyZZLePCGrzWMvztMiuY2SZbJFv_IBCB6rFdJzd5x7Ywx9-Hf11G3AKVO8nA/exec',
-    types: ['Resources', 'Props', 'Costumes', 'Lights/Sound', 'Instruments/Music']
   },
   'btc': {
     name: 'BTC',
     url: 'https://script.google.com/macros/s/AKfycbwX4vCjnLDqz03nfrqjbzPkyF_mUuH8UIQoXRSUB2UlSMRiHNBmjuzQhCaYTj3wmKUkmA/exec',
-    types: ['Props', 'Costumes', 'Set Pieces']
   }
 };
 
