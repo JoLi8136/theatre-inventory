@@ -28,7 +28,7 @@ const GROUP_CONFIG = {
   },
   'btc': {
     name: 'BTC',
-    url: '',
+    url: 'https://script.google.com/macros/s/AKfycbwX4vCjnLDqz03nfrqjbzPkyF_mUuH8UIQoXRSUB2UlSMRiHNBmjuzQhCaYTj3wmKUkmA/exec',
     types: ['Props', 'Costumes', 'Set Pieces']
   }
 };
