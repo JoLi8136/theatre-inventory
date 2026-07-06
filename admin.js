@@ -159,7 +159,7 @@ async function confirmReply() {
 Your request to borrow ${req.item_name} from the ${groupName} closet for ${req.show_name} has been approved! 🎉
 
 ${note ? `Note from the equipment chair:\n${note}\n` : ''}
-Please reach out to arrange pickup and make sure to return the item when your show is done.
+Please let us know if you need help picking up the items from the cage and make sure to return the item when your show is done.
 
 Best,
 ${groupName} Equipment Chair`

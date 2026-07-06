@@ -8,7 +8,7 @@ let searchQuery = '';
 let activeStatus = null;
 let activeGroup = null;
 
-const CHECKOUT_URL = 'https://script.google.com/macros/s/AKfycbz4peIvc7HqVMzYHcRJE0CUjeUHRSIBnSLN2TC9RGjGZ4tn21aTKJXOsbPi9zStEPqA/exec';
+const CHECKOUT_URL = 'https://script.google.com/macros/s/AKfycbzkuYoN79yRKNNHlBuDPCAcIQYu_nsfzamX9aA6i5DP2Vao0IJR5evm3w8wtME5kdfD/exec';
 let checkoutStatus = {};
 let borrowStatus = {};
 let selectedItems = new Set();
@@ -430,7 +430,7 @@ function openModal(index, itemId) {
         delete borrowStatus[id];
         applyUserFilters();
         modal.style.display = 'none';
-        const result = await returnCheckout(id);
+        const result = await returnBorrowedItem(id);
         hideLoadingOverlay();
         if (!result.success) {
             await loadCheckouts();
@@ -539,6 +539,7 @@ async function loadEmailConfig() {
     }
 }
 
+// BORROW ACTIONS
 function openBorrowEmail(itemList, userInfo = {}) {
     const groupsInvolved = [...new Set(itemList.map(({ item }) => item._group).filter(Boolean))];
 
@@ -600,6 +601,14 @@ ${groupAdminUrl}
             setTimeout(() => {window.location.href = mailto;}, i * 1500)
         }
     });
+}
+
+async function returnBorrowedItem(itemId) {
+    const res = await fetch(CHECKOUT_URL, {
+        method: 'POST',
+        body: JSON.stringify({ action: 'returnBorrow', item_id: itemId })
+    });
+    return res.json();
 }
 
 // MULTI SELECT
