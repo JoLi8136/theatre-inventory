@@ -636,8 +636,10 @@ function updateSelectionBar() {
     if (selectedItems.size > 0) {
         const selectedArray = [...selectedItems];
         const checkedOutCount = selectedArray.filter(id => checkoutStatus[id]).length;
+        const borrowedCount = selectedArray.filter(id => borrowStatus[id]).length;
+        const returnableCount = checkedOutCount + borrowedCount;
         const availableCount = selectedArray.filter(id => !checkoutStatus[id] && !borrowStatus[id]).length;
-        const allCheckedOut = checkedOutCount === selectedArray.length;
+        const allReturnable = returnableCount === selectedArray.length;
         const allAvailable = availableCount === selectedArray.length;
 
         bar.innerHTML = `
@@ -645,8 +647,8 @@ function updateSelectionBar() {
                 ${selectedItems.size} item${selectedItems.size > 1 ? 's' : ''} selected 
             </span>
             <div style="display:flex;gap:clamp(4px, 1vw, 8px;flex-wrap:wrap;justify-content:flex-end">
-                ${!allCheckedOut ? `<button onclick="bulkCheckout()">Check Out${availableCount !== selectedArray.length ? ` (${availableCount})` : ''}</button>` : ''}
-                ${!allCheckedOut ? `<button onclick="bulkBorrow()">Ask to Borrow${availableCount !== selectedArray.length ? `(${availableCount})` : ''}</button>` : ''}
+                ${!allReturnable ? `<button onclick="bulkCheckout()">Check Out${availableCount !== selectedArray.length ? ` (${availableCount})` : ''}</button>` : ''}
+                ${!allReturnable ? `<button onclick="bulkBorrow()">Ask to Borrow${availableCount !== selectedArray.length ? `(${availableCount})` : ''}</button>` : ''}
                 ${!allAvailable ? `<button onclick="bulkReturn()">Return${checkedOutCount !== selectedArray.length ? ` (${checkedOutCount})` : ''}</button>` : ''}
                 <button onclick = "clearSelection()">Clear</button>
             </div>
@@ -713,27 +715,34 @@ async function bulkCheckout() {
 }
 
 async function bulkReturn() {
-    const itemsToReturn = [...selectedItems].filter(itemId => checkoutStatus[itemId]);
-    if (itemsToReturn.length === 0) return;
+    const checkoutIds = [...selectedItems].filter(id => checkoutStatus[id]);
+    const borrowIds = [...selectedItems].filter(id => borrowStatus[id]);
+    const allReturnIds = [...checkoutIds, ...borrowIds];
+    if (allReturnIds.length === 0) return;
 
-    showLoadingOverlay(`Returning ${itemsToReturn.length} items ${itemsToReturn.length > 1 ? 's' : ''}...`);
-
-    for (const itemId of itemsToReturn) {
-        delete checkoutStatus[itemId];
-    }
+    // Optimistic update
+    checkoutIds.forEach(id => delete checkoutStatus[id]);
+    borrowIds.forEach(id => delete borrowStatus[id]);
     applyUserFilters();
 
     const failed = [];
-    for (const itemId of itemsToReturn) {
-        const result = await returnCheckout(itemId);
-        if (!result.success) failed.push(itemId);
+
+    for (const id of checkoutIds) {
+        const result = await returnCheckout(id);
+        if (!result.success) failed.push(id);
     }
 
-    hideLoadingOverlay();
+    for (const id of borrowIds) {
+        const result = await returnBorrowedItem(id);
+        if (!result.success) failed.push(id);
+    }
+
     clearSelection();
     applyUserFilters();
 
     if (failed.length > 0) {
+        await loadCheckouts();
+        applyUserFilters();
         alert(`${failed.length} item(s) failed to return. Please try again.`);
     }
 }
